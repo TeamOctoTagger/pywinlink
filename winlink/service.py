@@ -20,13 +20,6 @@ class SymlinkService(win32serviceutil.ServiceFramework):
         win32serviceutil.ServiceFramework.__init__(self, *args, **kwargs)
         self.running = True
 
-    def symlink(self, link, target, hardlink):
-        # TODO ensure source and link_name are real paths
-        if hardlink:
-            win32file.CreateHardLink(link, target)
-        else:
-            win32file.CreateSymbolicLink(link, target)
-
     def SvcStop(self):
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
         self.running = False
@@ -79,15 +72,43 @@ class SymlinkService(win32serviceutil.ServiceFramework):
                 if error or len(link) == 0:
                     continue
 
-                self.symlink(link, target, hardlink == "True")
+                if hardlink == "True":
+                    symlink = win32file.CreateSymbolicLink
+                else:
+                    symlink = win32file.CreateHardLink
 
-                win32file.WriteFile(pipe, "done")  # TODO better
+                try:
+                    symlink(link, target)
+                except win32api.error as e:
+                    if e[0] == 3:
+                        # The system cannot find the path specified
+                        win32file.WriteFile(
+                            pipe,
+                            "error:Source not found",
+                        )
+                        pass
+                    elif e[0] == 183:
+                        # Cannot create a file when that file already exists
+                        win32file.WriteFile(
+                            pipe,
+                            "error:Target already exists",
+                        )
+                        pass
+                    else:
+                        # we don't want the service to crash
+                        win32file.WriteFile(
+                            pipe,
+                            "error:" + e[2],
+                        )
+                        pass
+                else:
+                    win32file.WriteFile(pipe, "success")
 
                 win32file.FlushFileBuffers(pipe)
                 win32pipe.DisconnectNamedPipe(pipe)
             except win32api.error as e:
                 if e[0] == 536:
-                    # pipe waiting for other end to be opened
+                    # Waiting for a process to open the other end of the pipe
                     continue
                 raise
 

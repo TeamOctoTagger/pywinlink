@@ -9,17 +9,22 @@ from . import service
 def symlink(source, link_name, hardlink=False):
     # TODO ensure source and link_name are real paths
 
-    # connect to pipe
     while True:
-        pipe = win32file.CreateFile(
-            service.PIPE_NAME,
-            win32file.GENERIC_READ | win32file.GENERIC_WRITE,
-            0,
-            None,
-            win32file.OPEN_EXISTING,
-            win32file.FILE_ATTRIBUTE_NORMAL,
-            None,
-        )
+        try:
+            pipe = win32file.CreateFile(
+                service.PIPE_NAME,
+                win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+                0,
+                None,
+                win32file.OPEN_EXISTING,
+                win32file.FILE_ATTRIBUTE_NORMAL,
+                None,
+            )
+        except win32api.error as e:
+            if e[0] == 2:
+                # the system cannot find the file specified
+                raise IOError("Could not find pipe")
+            raise
 
         if pipe != win32file.INVALID_HANDLE_VALUE:
             # connection established
@@ -32,7 +37,7 @@ def symlink(source, link_name, hardlink=False):
             service.PIPE_NAME,
             win32pipe.NMPWAIT_USE_DEFAULT_WAIT
         ):
-            raise IOError("Pipe not available")
+            raise IOError("Pipe is busy")
 
     try:
         (error, bytes_written) = win32file.WriteFile(pipe, source)
@@ -51,7 +56,16 @@ def symlink(source, link_name, hardlink=False):
         if error:
             raise IOError("Could not read from service")
 
-        print result
+        if result == "success":
+            return
+        elif result.startswith("error:"):
+            error = result.split(":")[1]
+            raise IOError(error)
+        else:
+            raise IOError("Got unexpected response from service")
+    except win32api.error as e:
+        if e[0] == 109:
+            # the pipe has been ended
+            raise IOError("Service closed unexpectedly")
     finally:
-        # disconnect from pipe
         win32file.CloseHandle(pipe)
