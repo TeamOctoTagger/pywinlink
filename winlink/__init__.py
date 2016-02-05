@@ -11,7 +11,7 @@ def symlink(source, link_name, hardlink=False):
     while True:
         pipe = win32file.CreateFile(
             service.PIPE_NAME,
-            win32file.GENERIC_READ,  # | win32file.GENERIC_WRITE,
+            win32file.GENERIC_READ | win32file.GENERIC_WRITE,
             0,
             None,
             win32file.OPEN_EXISTING,

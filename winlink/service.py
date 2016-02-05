@@ -2,6 +2,7 @@ import winerror
 import win32api
 import win32file
 import win32pipe
+import win32security
 import win32service
 import win32serviceutil
 
@@ -30,6 +31,9 @@ class SymlinkService(win32serviceutil.ServiceFramework):
         self.running = False
 
     def SvcDoRun(self):
+        sa = win32security.SECURITY_ATTRIBUTES()
+        sa.SECURITY_DESCRIPTOR.SetDacl(True, None, False)
+
         pipe = win32pipe.CreateNamedPipe(
             PIPE_NAME,
             win32pipe.PIPE_ACCESS_DUPLEX,
@@ -43,7 +47,7 @@ class SymlinkService(win32serviceutil.ServiceFramework):
             BUFFER_SIZE,
             BUFFER_SIZE,
             0,
-            None,
+            sa,
         )
 
         if pipe == win32file.INVALID_HANDLE_VALUE:
