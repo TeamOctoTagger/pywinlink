@@ -6,8 +6,6 @@ import win32security
 import win32service
 import win32serviceutil
 
-import servicemanager
-
 PIPE_NAME = r'\\.\pipe\symlink'
 BUFFER_SIZE = 4096
 SLEEP_TIME = 50
@@ -97,5 +95,9 @@ class SymlinkService(win32serviceutil.ServiceFramework):
         self.ReportServiceStatus(win32service.SERVICE_STOPPED)
 
 
-if __name__ == '__main__':
+def main():
     win32serviceutil.HandleCommandLine(SymlinkService)
+
+
+if __name__ == '__main__':
+    main()
