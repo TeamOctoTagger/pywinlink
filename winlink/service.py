@@ -1,11 +1,13 @@
-import subprocess
-import win32event
+import winerror
+import win32api
 import win32file
 import win32pipe
 import win32service
 import win32serviceutil
 
+PIPE_NAME = r'\\.\pipe\symlink'
 BUFFER_SIZE = 4096
+SLEEP_TIME = 50
 
 
 class SymlinkService(win32serviceutil.ServiceFramework):
@@ -15,28 +17,28 @@ class SymlinkService(win32serviceutil.ServiceFramework):
 
     def __init__(self, *args, **kwargs):
         win32serviceutil.ServiceFramework.__init__(self, *args, **kwargs)
-        self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
+        self.running = True
 
     def symlink(self, link, target, hardlink=False):
-        command = "cmd /c mklink "
         if hardlink:
-            command = command + "/h "
-        command = command + link + " " + target
-        subprocess.call(command, shell=False)
+            win32file.CreateHardLink(link, target)
+        else:
+            win32file.CreateSymbolicLink(link, target)
 
     def SvcStop(self):
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
-        win32event.SetEvent(self.hWaitStop)
+        self.running = False
 
     def SvcDoRun(self):
-        #import servicemanager
-        #servicemanager.LogMsg(servicemanager.EVENTLOG_INFORMATION_TYPE, servicemanager.PYS_SERVICE_STARTED,
-        #                      (self._svc_name_, ''))
-
-        hPipe = win32pipe.CreateNamedPipe(
-            "\\\\.\\pipe\\symlink",
+        pipe = win32pipe.CreateNamedPipe(
+            PIPE_NAME,
             win32pipe.PIPE_ACCESS_DUPLEX,
-            win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,  # TODO win32pipe.PIPE_REJECT_REMOTE_CLIENTS
+            (
+                win32pipe.PIPE_TYPE_MESSAGE |
+                win32pipe.PIPE_READMODE_MESSAGE |
+                win32pipe.PIPE_NOWAIT
+                # TODO win32pipe.PIPE_REJECT_REMOTE_CLIENTS
+            ),
             1,
             BUFFER_SIZE,
             BUFFER_SIZE,
@@ -44,28 +46,29 @@ class SymlinkService(win32serviceutil.ServiceFramework):
             None,
         )
 
-        if hPipe is None or hPipe == win32file.INVALID_HANDLE_VALUE:
-            self.ReportServiceStatus(win32service.SERVICE_STOPPED)
-            return
+        if pipe == win32file.INVALID_HANDLE_VALUE:
+            raise IOError("Could not create pipe", win32api.GetLastError())
 
-        timeout = 50
+        while self.running:
+            win32api.Sleep(SLEEP_TIME)
 
-        while True:
-            # check to see if self.hWaitStop happened
-            rc = win32event.WaitForSingleObject(self.hWaitStop, timeout)
-            if rc == win32event.WAIT_OBJECT_0:
-                self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
-                break
+            try:
+                # make sure no client is connected
+                win32pipe.DisconnectNamedPipe(pipe)
 
-            # check for client
-            win32pipe.DisconnectNamedPipe(hPipe)
-            connected = win32pipe.ConnectNamedPipe(hPipe, None)
-            if not connected:
+                # connect to a new client
+                connected = (
+                    win32pipe.ConnectNamedPipe(pipe, None) or
+                    win32api.GetLastError() == winerror.ERROR_PIPE_CONNECTED
+                )
+                if not connected:
+                    continue
+
+                # TODO read paths and create link
+            except win32api.error:
                 continue
 
-            # TODO read paths and create link
-
-        win32file.CloseHandle(hPipe)
+        win32file.CloseHandle(pipe)
         self.ReportServiceStatus(win32service.SERVICE_STOPPED)
 
 

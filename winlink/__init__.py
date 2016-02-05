@@ -1,28 +1,39 @@
-import os
-import sys
-import win32serviceutil
-import win32service
-import win32event
+import winerror
 import win32api
 import win32file
 import win32pipe
 
-def symlink(source, link_name, hardlink=False):
-    hPipe = win32file.CreateFile(
-        "\\\\.\\pipe\\symlink",
-        win32file.GENERIC_READ,  # | win32file.GENERIC_WRITE,
-        0,
-        None,
-        win32file.OPEN_EXISTING,
-        win32file.FILE_ATTRIBUTE_NORMAL,
-        None,
-    )
+from . import service
 
-    if hPipe is None or hPipe == win32file.INVALID_HANDLE_VALUE:
-        print("Error!")
-        raise None  # TODO handle missing pipe
+
+def symlink(source, link_name, hardlink=False):
+    # connect to pipe
+    while True:
+        pipe = win32file.CreateFile(
+            service.PIPE_NAME,
+            win32file.GENERIC_READ,  # | win32file.GENERIC_WRITE,
+            0,
+            None,
+            win32file.OPEN_EXISTING,
+            win32file.FILE_ATTRIBUTE_NORMAL,
+            None,
+        )
+
+        if pipe != win32file.INVALID_HANDLE_VALUE:
+            # connection established
+            break
+
+        if win32api.GetLastError() != winerror.ERROR_PIPE_BUSY:
+            raise IOError("Could not open pipe")
+
+        if not win32pipe.WaitNamedPipe(
+            service.PIPE_NAME,
+            win32pipe.NMPWAIT_USE_DEFAULT_WAIT
+        ):
+            raise IOError("Pipe not available")
 
     # TODO write paths
     print("Works!")
 
-    win32file.CloseHandle(hPipe)
+    # disconnect from pipe
+    win32file.CloseHandle(pipe)
