@@ -6,6 +6,8 @@ import win32security
 import win32service
 import win32serviceutil
 
+import servicemanager
+
 PIPE_NAME = r'\\.\pipe\symlink'
 BUFFER_SIZE = 4096
 SLEEP_TIME = 50
@@ -20,7 +22,8 @@ class SymlinkService(win32serviceutil.ServiceFramework):
         win32serviceutil.ServiceFramework.__init__(self, *args, **kwargs)
         self.running = True
 
-    def symlink(self, link, target, hardlink=False):
+    def symlink(self, link, target, hardlink):
+        # TODO ensure source and link_name are real paths
         if hardlink:
             win32file.CreateHardLink(link, target)
         else:
@@ -57,20 +60,38 @@ class SymlinkService(win32serviceutil.ServiceFramework):
             win32api.Sleep(SLEEP_TIME)
 
             try:
-                # make sure no client is connected
-                win32pipe.DisconnectNamedPipe(pipe)
-
                 # connect to a new client
                 connected = (
-                    win32pipe.ConnectNamedPipe(pipe, None) or
+                    win32pipe.ConnectNamedPipe(pipe, None) != 0 or
+                    win32api.GetLastError() == winerror.ERROR_SUCCESS or
                     win32api.GetLastError() == winerror.ERROR_PIPE_CONNECTED
                 )
                 if not connected:
                     continue
 
-                # TODO read paths and create link
-            except win32api.error:
-                continue
+                (error, target) = win32file.ReadFile(pipe, BUFFER_SIZE)
+                if error or len(target) == 0:
+                    continue
+
+                (error, link) = win32file.ReadFile(pipe, BUFFER_SIZE)
+                if error or len(link) == 0:
+                    continue
+
+                (error, hardlink) = win32file.ReadFile(pipe, BUFFER_SIZE)
+                if error or len(link) == 0:
+                    continue
+
+                self.symlink(link, target, hardlink == "True")
+
+                win32file.WriteFile(pipe, "done")  # TODO better
+
+                win32file.FlushFileBuffers(pipe)
+                win32pipe.DisconnectNamedPipe(pipe)
+            except win32api.error as e:
+                if e[0] == 536:
+                    # pipe waiting for other end to be opened
+                    continue
+                raise
 
         win32file.CloseHandle(pipe)
         self.ReportServiceStatus(win32service.SERVICE_STOPPED)

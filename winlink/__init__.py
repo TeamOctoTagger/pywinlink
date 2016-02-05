@@ -7,6 +7,8 @@ from . import service
 
 
 def symlink(source, link_name, hardlink=False):
+    # TODO ensure source and link_name are real paths
+
     # connect to pipe
     while True:
         pipe = win32file.CreateFile(
@@ -32,8 +34,24 @@ def symlink(source, link_name, hardlink=False):
         ):
             raise IOError("Pipe not available")
 
-    # TODO write paths
-    print("Works!")
+    try:
+        (error, bytes_written) = win32file.WriteFile(pipe, source)
+        if error:
+            raise IOError("Could not write source path to service")
 
-    # disconnect from pipe
-    win32file.CloseHandle(pipe)
+        (error, bytes_written) = win32file.WriteFile(pipe, link_name)
+        if error:
+            raise IOError("Could not write link path to service")
+
+        (error, bytes_written) = win32file.WriteFile(pipe, str(hardlink))
+        if error:
+            raise IOError("Could not write link type to service")
+
+        (error, result) = win32file.ReadFile(pipe, service.BUFFER_SIZE)
+        if error:
+            raise IOError("Could not read from service")
+
+        print result
+    finally:
+        # disconnect from pipe
+        win32file.CloseHandle(pipe)
