@@ -35,11 +35,16 @@ def symlink(source, link_name, hardlink=False):
         if win32api.GetLastError() != winerror.ERROR_PIPE_BUSY:
             raise IOError("Could not open pipe")
 
-        if not win32pipe.WaitNamedPipe(
-            service.PIPE_NAME,
-            win32pipe.NMPWAIT_USE_DEFAULT_WAIT
-        ):
-            raise IOError("Pipe is busy")
+        try:
+            win32pipe.WaitNamedPipe(
+                service.PIPE_NAME,
+                win32pipe.NMPWAIT_USE_DEFAULT_WAIT,
+            )
+        except win32api.error as e:
+            if e[0] == winerror.ERROR_SEM_TIMEOUT:
+                pass
+            else:
+                raise
 
     try:
         (error, bytes_written) = win32file.WriteFile(
