@@ -82,15 +82,13 @@ class SymlinkService(win32serviceutil.ServiceFramework):
                 try:
                     symlink(link, target)
                 except win32api.error as e:
-                    if e[0] == 3:
-                        # The system cannot find the path specified
+                    if e[0] == winerror.ERROR_PATH_NOT_FOUND:
                         win32file.WriteFile(
                             pipe,
                             "error:Source not found",
                         )
                         pass
-                    elif e[0] == 183:
-                        # Cannot create a file when that file already exists
+                    elif e[0] == winerror.ERROR_ALREADY_EXISTS:
                         win32file.WriteFile(
                             pipe,
                             "error:Target already exists",
@@ -109,10 +107,10 @@ class SymlinkService(win32serviceutil.ServiceFramework):
                 win32file.FlushFileBuffers(pipe)
                 win32pipe.DisconnectNamedPipe(pipe)
             except win32api.error as e:
-                if e[0] == 536:
-                    # Waiting for a process to open the other end of the pipe
+                if e[0] == winerror.ERROR_PIPE_LISTENING:
                     continue
-                raise
+                else:
+                    raise
 
         win32file.CloseHandle(pipe)
         self.ReportServiceStatus(win32service.SERVICE_STOPPED)

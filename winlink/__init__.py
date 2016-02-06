@@ -21,11 +21,9 @@ def symlink(source, link_name, hardlink=False):
                 None,
             )
         except win32api.error as e:
-            if e[0] == 2:
-                # The system cannot find the file specified
+            if e[0] == winerror.ERROR_FILE_NOT_FOUND:
                 raise IOError("Could not find pipe")
-            elif e[0] == 231:
-                # All pipe instances are busy
+            elif e[0] == winerror.ERROR_PIPE_BUSY:
                 pass
             else:
                 raise
@@ -74,8 +72,7 @@ def symlink(source, link_name, hardlink=False):
         else:
             raise IOError("Got unexpected response from service")
     except win32api.error as e:
-        if e[0] == 109:
-            # The pipe has been ended
+        if e[0] == winerror.ERROR_BROKEN_PIPE:
             raise IOError("Service closed unexpectedly")
     finally:
         win32file.CloseHandle(pipe)
