@@ -65,10 +65,12 @@ class SymlinkService(win32serviceutil.ServiceFramework):
                 (error, target) = win32file.ReadFile(pipe, BUFFER_SIZE)
                 if error or len(target) == 0:
                     continue
+                target = target.decode('UTF-8')
 
                 (error, link) = win32file.ReadFile(pipe, BUFFER_SIZE)
                 if error or len(link) == 0:
                     continue
+                link = link.decode("UTF-8")
 
                 (error, hardlink) = win32file.ReadFile(pipe, BUFFER_SIZE)
                 if error or len(link) == 0:
@@ -108,6 +110,10 @@ class SymlinkService(win32serviceutil.ServiceFramework):
                 win32pipe.DisconnectNamedPipe(pipe)
             except win32api.error as e:
                 if e[0] == winerror.ERROR_PIPE_LISTENING:
+                    continue
+                elif e[0] == winerror.ERROR_BROKEN_PIPE:
+                    continue
+                elif e[0] == winerror.ERROR_NO_DATA:
                     continue
                 else:
                     raise

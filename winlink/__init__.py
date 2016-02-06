@@ -49,14 +49,14 @@ def symlink(source, link_name, hardlink=False):
     try:
         (error, bytes_written) = win32file.WriteFile(
             pipe,
-            os.path.abspath(source),
+            os.path.abspath(source).encode('UTF-8'),
         )
         if error:
             raise IOError("Could not write source path to service")
 
         (error, bytes_written) = win32file.WriteFile(
             pipe,
-            os.path.abspath(link_name),
+            os.path.abspath(link_name).encode('UTF-8'),
         )
         if error:
             raise IOError("Could not write link path to service")
