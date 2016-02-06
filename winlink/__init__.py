@@ -8,6 +8,7 @@ from . import service
 
 
 def symlink(source, link_name, hardlink=False):
+    pipe = win32file.INVALID_HANDLE_VALUE
     while True:
         try:
             pipe = win32file.CreateFile(
