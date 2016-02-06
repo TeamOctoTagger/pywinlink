@@ -1,3 +1,4 @@
+import os.path
 import winerror
 import win32api
 import win32file
@@ -42,11 +43,17 @@ def symlink(source, link_name, hardlink=False):
             raise IOError("Pipe is busy")
 
     try:
-        (error, bytes_written) = win32file.WriteFile(pipe, source)
+        (error, bytes_written) = win32file.WriteFile(
+            pipe,
+            os.path.abspath(source),
+        )
         if error:
             raise IOError("Could not write source path to service")
 
-        (error, bytes_written) = win32file.WriteFile(pipe, link_name)
+        (error, bytes_written) = win32file.WriteFile(
+            pipe,
+            os.path.abspath(link_name),
+        )
         if error:
             raise IOError("Could not write link path to service")
 
