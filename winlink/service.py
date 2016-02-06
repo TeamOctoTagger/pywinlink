@@ -73,9 +73,9 @@ class SymlinkService(win32serviceutil.ServiceFramework):
                     continue
 
                 if hardlink == "True":
-                    symlink = win32file.CreateSymbolicLink
-                else:
                     symlink = win32file.CreateHardLink
+                else:
+                    symlink = win32file.CreateSymbolicLink
 
                 try:
                     symlink(link, target)
