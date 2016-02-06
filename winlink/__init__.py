@@ -7,8 +7,6 @@ from . import service
 
 
 def symlink(source, link_name, hardlink=False):
-    # TODO ensure source and link_name are real paths
-
     while True:
         try:
             pipe = win32file.CreateFile(
@@ -22,9 +20,13 @@ def symlink(source, link_name, hardlink=False):
             )
         except win32api.error as e:
             if e[0] == 2:
-                # the system cannot find the file specified
+                # The system cannot find the file specified
                 raise IOError("Could not find pipe")
-            raise
+            elif e[0] == 231:
+                # All pipe instances are busy
+                pass
+            else:
+                raise
 
         if pipe != win32file.INVALID_HANDLE_VALUE:
             # connection established
@@ -65,7 +67,7 @@ def symlink(source, link_name, hardlink=False):
             raise IOError("Got unexpected response from service")
     except win32api.error as e:
         if e[0] == 109:
-            # the pipe has been ended
+            # The pipe has been ended
             raise IOError("Service closed unexpectedly")
     finally:
         win32file.CloseHandle(pipe)

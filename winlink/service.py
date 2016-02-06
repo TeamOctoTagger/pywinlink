@@ -7,7 +7,8 @@ import win32service
 import win32serviceutil
 
 PIPE_NAME = r'\\.\pipe\symlink'
-BUFFER_SIZE = 4096
+BUFFER_SIZE = 256
+WAIT_TIME = 50
 SLEEP_TIME = 50
 
 
@@ -27,6 +28,7 @@ class SymlinkService(win32serviceutil.ServiceFramework):
     def SvcDoRun(self):
         sa = win32security.SECURITY_ATTRIBUTES()
         sa.SECURITY_DESCRIPTOR.SetDacl(True, None, False)
+        # TODO restrict more for better security
 
         pipe = win32pipe.CreateNamedPipe(
             PIPE_NAME,
@@ -40,7 +42,7 @@ class SymlinkService(win32serviceutil.ServiceFramework):
             1,
             BUFFER_SIZE,
             BUFFER_SIZE,
-            0,
+            WAIT_TIME,
             sa,
         )
 
@@ -118,7 +120,3 @@ class SymlinkService(win32serviceutil.ServiceFramework):
 
 def main():
     win32serviceutil.HandleCommandLine(SymlinkService)
-
-
-if __name__ == '__main__':
-    main()
